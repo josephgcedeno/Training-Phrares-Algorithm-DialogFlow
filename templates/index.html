@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traing here</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.12.6/js/standalone/selectize.min.js" integrity="sha256-+C0A5Ilqmu4QcSPxrlGpaZxJ04VjsRjKu+G82kl5UJk=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.12.6/css/selectize.bootstrap3.min.css" integrity="sha256-ze/OEYGcFbPRmvCnrSeKbRTtjG4vGLHXgOqsyLFTRjg=" crossorigin="anonymous" />
+      <!-- Bootstrap-Core-CSS -->
+  <style>
+      body{
+          margin: 0;
+          padding: 3%;
+      }
+  </style>
+</head>
+<body>
+
+    <form>
+        <select id="exampleFormControlInput1" placeholder="Select Intent">
+            <option value="">Select a state...</option>
+            {% for i in intent_option %}
+                <option value="{{i['intent_id']}}">{{i['intent_display_name']}}</option>
+            {% endfor %}
+        </select>
+        <div class="form-group">
+          <label for="exampleFormControlInput1Backup">Intent ID</label>
+          <input type="text" class="form-control" id="exampleFormControlInput1Backup" placeholder="ex. 164975a5-bbf2-44a1-b377-edafedb70f99">
+        </div>
+        <div class="form-group">
+            <label for="exampleFormControlInput2">Assign Entity</label>
+            <input type="text" class="form-control" id="exampleFormControlInput2" placeholder="ex. @answers:father_cad">
+        </div>
+      
+        <div class="form-group">
+          <label for="exampleFormControlTextarea1">Training Phrases</label>
+          <textarea class="form-control" id="exampleFormControlTextarea1" rows="10"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="previewlist">Preview Data to Edit</label>
+            <textarea class="form-control" id="previewlist" rows="5" disabled></textarea>
+        </div>
+        <div class="form-group">
+            <div class="progress" style="display: none;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" id="theprogressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%"></div>
+            </div>
+        </div>
+
+
+        <button type="button" onclick="arrangeList()" class="btn btn-primary">Arrange</button>
+        <button type="submit" class="btn btn-primary">Start Traing</button>
+    </div>
+
+      </form>
+</body>
+</html>
+<script>
+
+    $('select').selectize({
+        sortField: 'text',
+        highlight:false
+    });
+
+    const arrangeList = ()=>
+    {
+        const prev = $("#exampleFormControlTextarea1").val();
+        if(prev==null||prev==""){
+            alert("cannot be empty the training")
+            return
+        }
+        
+        const arrange = prev.split("\n").filter(function (el) {
+            return el != "" 
+        });
+        $("#previewlist").val(`${arrange}`);
+        $("#previewlist").prop("disabled",false);
+        
+    }
+    const sleep =  (time) => {
+        return new Promise((resolve) => setTimeout(resolve, time));
+    }
+
+    $("form").on("submit", function (e) {
+        
+        e.preventDefault();
+        
+        const prev = $("#previewlist").val();
+        var intentid = $("#exampleFormControlInput1").val();
+        const intentidbackup = $(`#exampleFormControlInput1Backup`).val();
+        const assignentity = $("#exampleFormControlInput2").val();
+        intentid = intentidbackup!="" ? intentidbackup : intentid=="" ? alert("empty id") : intentid;
+        if(prev==null||prev==""|| (intentid=="" ))
+        {
+            alert("cannot be empty the training or Intent ID")
+            return
+        }
+        else if(prev.match(/:/i) && assignentity=="" )
+        {
+            alert("When assigning an entity, cannot empty entitiy field")
+            return
+        }
+        $("button").prop("disabled",true);
+        $("#previewlist").prop("disabled",true);
+        $(".progress").show();
+
+        var traingthis = prev.split(",");
+        var i = 0;
+        var trainOrigLength = traingthis.length;
+        var newprogress = 0;
+
+
+
+        const loopData = ()=>
+        {
+            
+            setTimeout(function() {
+
+                traingthis.shift();
+
+                $("#previewlist").val(traingthis);
+                
+                if (i < trainOrigLength) {
+
+                    i++; 
+                    newprogress = (i/ trainOrigLength) * 100
+
+                    $('#theprogressbar').attr('aria-valuenow', newprogress).css('width', newprogress+'%');
+
+                    loopData();
+                }
+                else 
+                {
+
+                    $("button").prop("disabled",false);
+
+                    $("#previewlist").prop("disabled",false);
+
+                    $(".progress").hide();
+
+                    $('#theprogressbar').attr('aria-valuenow', 0).css('width', '0%');
+
+                    alert("Finish Training")
+                     
+                }
+                                  
+            }, 500)
+        }
+        $.ajax({
+            type: "POST",
+            url: "/train_data",
+            dataType: "json",
+            data: {
+                intent_id:intentid,
+                entity:assignentity,
+                phrases:traingthis
+            },
+            success:(data)=>
+            {
+                if(data.success)
+                {
+                    loopData();
+                }
+            }
+        });
+
+
+        
+   
+        
+    });
+</script>
